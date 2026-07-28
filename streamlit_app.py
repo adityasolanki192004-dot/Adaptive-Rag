@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-BACKEND_URL = "YOUR_BACKEND_URL"
+BACKEND_URL = "https://adaptive-rag-frontend-we4k.onrender.com"
 
 st.title("Adaptive RAG Chat")
 
