@@ -9,12 +9,12 @@ tavily-python
 bs4~=0.0.2
 requests~=2.32.4
 beautifulsoup4~=4.13.4
-pydantic~=2.11.7
+pydantic>=2.11.7
 langchain-text-splitters~=0.3.9
 python-dotenv~=1.1.1
 PyYAML~=6.0.2
-fastapi
-uvicorn
+fastapi>=0.116.0
+uvicorn[standard]>=0.35.0
 motor
 pymongo
 streamlit
