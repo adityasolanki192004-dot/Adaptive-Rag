@@ -39,7 +39,7 @@ if st.session_state.show_logout_confirm:
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
             # Redirect to home page
-            st.switch_page("Home.py")
+          st.switch_page("home.py")
     with col_cancel:
         if st.button("❌ Cancel"):
             st.session_state.show_logout_confirm = False
