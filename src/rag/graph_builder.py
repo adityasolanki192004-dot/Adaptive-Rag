@@ -163,18 +163,16 @@ def rewrite_query(state: State):
     }
 
 def generate(state: State):
-    """
-    Generate the final answer for the user.
-    """
     context = state["messages"][-1].content
+    question = state.get("latest_query", "")
 
     generate_prompt = PromptTemplate(
         template=config.prompt("generate_prompt"),
-        input_variables=["context"]
+        input_variables=["question", "context"]
     )
 
     generate_chain = generate_prompt | llm
-    result = generate_chain.invoke({"context": context})
+    result = generate_chain.invoke({"question": question, "context": context})
 
     retry = state.get("generate_retry", 0) + 1
 
