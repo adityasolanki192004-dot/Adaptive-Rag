@@ -5,7 +5,7 @@ import requests
 BACKEND_URL = "https://adaptive-rag-backend-fyyu.onrender.com"
 
 # Page Title
-st.title("Adaptive RAG Chat")
+st.title("Adaptive RAG Chat")   
 
 uploaded_file = st.file_uploader(
     "Upload Document",
