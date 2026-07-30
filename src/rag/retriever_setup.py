@@ -26,7 +26,7 @@ def retriever_chain(chunks: list[Document]):
     Returns:
         Boolean indicating success of the operation.
     """
-    global _faiss_vectorstore
+
 
     try:
         # Commenting out Qdrant code for temporary FAISS usage
@@ -66,7 +66,7 @@ def get_retriever():
     Raises:
         Exception: If vector store initialization fails.
     """
-    global _faiss_vectorstore
+  
 
     try:
         # Commenting out Qdrant code for temporary FAISS usage
@@ -80,7 +80,6 @@ def get_retriever():
         # retriever = vectorstore.as_retriever()
 
         # Use the global vectorstore if it exists (documents have been uploaded)
-        if _faiss_vectorstore is not None:
             retriever = _faiss_vectorstore.as_retriever()
             print("Using existing FAISS vectorstore with uploaded documents")
         else:
@@ -93,10 +92,6 @@ def get_retriever():
                 metadata={"source": "initialization"}
             )
 
-            _faiss_vectorstore = FAISS.from_documents(
-                documents=[dummy_doc],
-                embedding=embeddings
-            )
             retriever = _faiss_vectorstore.as_retriever()
 
         # Load document description
