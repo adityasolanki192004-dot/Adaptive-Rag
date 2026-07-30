@@ -30,17 +30,18 @@ def routing_tool(state: State) -> Literal["retriever", "general_llm", "web_searc
     return "web_search"
 
 
-def doc_tool(state: State) -> Literal["rewrite", "generate"]:
-    """
-    Decide whether retrieved documents are relevant.
-    """
-
+def doc_tool(state):
     score = str(state.get("binary_score", "no")).strip().lower()
 
-    print(f"[doc_tool] score = {score}")
+    retry = state.get("retry_count", 0)
+
+    print(f"[doc_tool] score={score}, retry={retry}")
 
     if score in ["yes", "true"]:
         return "generate"
+
+    if retry >= 2:
+        return "web_search"
 
     return "rewrite"
 
