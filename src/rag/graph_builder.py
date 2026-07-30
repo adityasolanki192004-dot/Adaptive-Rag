@@ -172,13 +172,13 @@ def generate(state: State):
     )
 
     generate_chain = generate_prompt | llm
-    result = generate_chain.invoke({"context": context})
+result = generate_chain.invoke({"context": context})
 
- return {
-    "messages": [
-        AIMessage(content=result.content)
-    ]
-}
+    return {
+        "messages": [
+            AIMessage(content=result.content)
+        ]
+    }
 
 
 def web_search(state: State):
