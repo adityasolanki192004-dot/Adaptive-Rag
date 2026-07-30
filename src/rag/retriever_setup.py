@@ -85,13 +85,7 @@ def get_retriever():
         else:
             # No documents uploaded yet, create dummy for initialization
             print("No documents uploaded yet, creating dummy vectorstore")
-            from langchain_core.documents import Document as LangChainDocument
-
-            dummy_doc = LangChainDocument(
-                page_content="No documents have been uploaded yet. Please upload a document first.",
-                metadata={"source": "initialization"}
-            )
-
+            
             retriever = _faiss_vectorstore.as_retriever()
 
         # Load document description
