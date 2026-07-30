@@ -28,6 +28,13 @@ if "history_search" not in st.session_state:
     st.session_state.history_search = ""
 if "question_input" not in st.session_state:
     st.session_state.question_input = ""
+if "clear_input" not in st.session_state:
+    st.session_state.clear_input = False
+
+# Clear the input BEFORE the widget is instantiated this run (safe to do here)
+if st.session_state.clear_input:
+    st.session_state.question_input = ""
+    st.session_state.clear_input = False
 
 # ------------------------------------------------------------------
 # Theme colors
@@ -419,7 +426,7 @@ if send_clicked:
                     "sources": sources,
                     "elapsed": elapsed,
                 })
-                st.session_state.question_input = ""
+                st.session_state.clear_input = True
                 st.rerun()
             else:
                 st.error(f"Error: {response.status_code}")
