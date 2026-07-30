@@ -74,7 +74,10 @@ def get_retriever():
                 collection_name=settings.CODE_COLLECTION,
             )
 
-        retriever = vectorstore.as_retriever()
+        # k=3 caps how many chunks get pulled into a single prompt. Without
+        # this, a large document can push a single request past the
+        # account's tokens-per-minute limit (OpenAI 429 "Request too large").
+        retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 
         # Load document description
         if os.path.exists("description.txt"):
