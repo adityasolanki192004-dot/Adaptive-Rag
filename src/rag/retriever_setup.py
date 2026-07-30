@@ -7,8 +7,7 @@ import os
 from langchain_core.documents import Document
 from langchain_core.tools import create_retriever_tool
 from langchain_openai import OpenAIEmbeddings
-# from langchain_qdrant import QdrantVectorStore
-from langchain_community.vectorstores import FAISS
+from langchain_qdrant import QdrantVectorStore
 
 from src.core.config import settings
 
