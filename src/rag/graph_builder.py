@@ -153,16 +153,9 @@ def rewrite_query(state: State):
         "retry_count": retry
     }
 
-
 def generate(state: State):
     """
     Generate the final answer for the user.
-
-    Args:
-        state (State): State of the question.
-
-    Returns:
-        dict: Generated response.
     """
     context = state["messages"][-1].content
 
@@ -172,14 +165,13 @@ def generate(state: State):
     )
 
     generate_chain = generate_prompt | llm
-result = generate_chain.invoke({"context": context})
+    result = generate_chain.invoke({"context": context})
 
     return {
         "messages": [
             AIMessage(content=result.content)
         ]
     }
-
 
 def web_search(state: State):
     """
