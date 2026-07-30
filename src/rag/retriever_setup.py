@@ -35,19 +35,19 @@ def retriever_chain(chunks: list[Document]):
         #     api_key=settings.QDRANT_API_KEY,
         #     collection_name=settings.CODE_COLLECTION,
         # )
-        QdrantVectorStore.from_documents(
-    documents=chunks,
-    embedding=embeddings,
-    url=settings.QDRANT_URL,
-    api_key=settings.QDRANT_API_KEY,
-    collection_name=settings.CODE_COLLECTION,
-)
+        try:
+    QdrantVectorStore.from_documents(
+        documents=chunks,
+        embedding=embeddings,
+        url=settings.QDRANT_URL,
+        api_key=settings.QDRANT_API_KEY,
+        collection_name=settings.CODE_COLLECTION,
+    )
 
-print(f"Stored {len(chunks)} chunks in Qdrant")
-
-return True
+    print(f"Stored {len(chunks)} chunks in Qdrant")
+    return True
     except Exception as e:
-        print(f"Error storing documents in FAISS: {e}")
+        print(f"Error storing documents in Qdrant: {e}")
         return False
 
 
@@ -75,14 +75,7 @@ def get_retriever():
         #     collection_name=settings.CODE_COLLECTION,
         # )
         # retriever = vectorstore.as_retriever()
-
-        # Use the global vectorstore if it exists (documents have been uploaded)
-            retriever = _faiss_vectorstore.as_retriever()
-            print("Using existing FAISS vectorstore with uploaded documents")
-        else:
-            # No documents uploaded yet, create dummy for initialization
-            print("No documents uploaded yet, creating dummy vectorstore")
-            
+    
 
         # Load document description
         if os.path.exists("description.txt"):
