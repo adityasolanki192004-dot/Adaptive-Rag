@@ -18,7 +18,6 @@ embeddings = OpenAIEmbeddings()
 
 def retriever_chain(chunks: list[Document]):
     """
-    Initialize and store documents in FAISS vector database.
 
     Args:
         chunks: List of document chunks to store.
