@@ -216,7 +216,7 @@ graph.add_edge("retriever", "grade")
 graph.add_edge("rewrite", "retriever")
 graph.add_conditional_edges("query_analysis", routing_tool)
 graph.add_conditional_edges("grade", doc_tool)
-graph.add_edge("generate", END)
+graph.add_conditional_edges("generate", verify_answer)
 graph.add_edge("general_llm", END)
 
 builder = graph.compile()
