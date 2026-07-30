@@ -4,6 +4,7 @@ API routes for RAG operations.
 
 from fastapi import APIRouter, UploadFile, File, Header, HTTPException
 from langchain_core.messages import HumanMessage, AIMessage
+from openai import RateLimitError
 
 from src.core.logger import logger
 from src.memory.chat_history_mongo import ChatHistory
@@ -29,7 +30,7 @@ async def rag_query(req: QueryRequest):
         chat_history = ChatHistory.get_session_history(req.session_id)
         await chat_history.add_message(HumanMessage(content=req.query))
 
-        # Fetch full history
+        # Fetch recent history (bounded - see ChatHistory.get_messages)
         messages = await chat_history.get_messages()
         result = builder.invoke({
             "messages": messages
@@ -40,6 +41,16 @@ async def rag_query(req: QueryRequest):
         await chat_history.add_message(AIMessage(content=output_text))
 
         return {"result": result["messages"][-1]}
+
+    except RateLimitError as e:
+        logger.exception("rag_query hit an OpenAI rate limit")
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "The OpenAI account for this app is rate-limited right now. "
+                "Please wait a moment and try again, or use a shorter question."
+            ),
+        ) from e
 
     except Exception as e:
         logger.exception("rag_query failed")
@@ -76,4 +87,3 @@ async def upload_file(
             status_code=500,
             detail=f"Failed to upload document: {e}"
         )
-
