@@ -144,9 +144,12 @@ def rewrite_query(state: State):
     result = chain.invoke({"query": query})
     print(result)
 
-    return {
-        "latest_query": result.content
-    }
+    retry = state.get("retry_count", 0) + 1
+
+return {
+    "latest_query": result.content,
+    "retry_count": retry
+}
 
 
 def generate(state: State):
