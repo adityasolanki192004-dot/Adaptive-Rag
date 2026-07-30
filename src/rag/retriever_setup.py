@@ -28,13 +28,13 @@ def retriever_chain(chunks: list[Document]) -> bool:
     """
     try:
         QdrantVectorStore.from_documents(
-    documents=chunks,
-    embedding=embeddings,
-    url=settings.QDRANT_URL,
-    api_key=settings.QDRANT_API_KEY,
-    collection_name=settings.CODE_COLLECTION,
-    force_recreate=True,
-)
+            documents=chunks,
+            embedding=embeddings,
+            url=settings.QDRANT_URL,
+            api_key=settings.QDRANT_API_KEY,
+            collection_name=settings.CODE_COLLECTION,
+            force_recreate=True,
+        )
 
         print(f"Stored {len(chunks)} chunks in Qdrant")
         return True
