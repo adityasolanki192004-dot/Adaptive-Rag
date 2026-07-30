@@ -30,6 +30,16 @@ if "question_input" not in st.session_state:
     st.session_state.question_input = ""
 if "clear_input" not in st.session_state:
     st.session_state.clear_input = False
+if "uploaded_files_seen" not in st.session_state:
+    # BUG FIX: tracks (name, size) pairs already sent to the backend so the
+    # widget's persisted file doesn't get re-uploaded on every rerun
+    # (e.g. every time a chat message is sent). This was inflating the
+    # "Documents Uploaded" counter (18 for a single file in the screenshot).
+    st.session_state.uploaded_files_seen = set()
+if "is_thinking" not in st.session_state:
+    st.session_state.is_thinking = False
+if "upload_toast" not in st.session_state:
+    st.session_state.upload_toast = None
 
 # Clear the input BEFORE the widget is instantiated this run (safe to do here)
 if st.session_state.clear_input:
@@ -83,15 +93,19 @@ st.markdown(
         font-weight: 800;
         text-align: center;
         background: {accent_grad};
+        background-size: 200% auto;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
-        animation: titlePop 0.6s ease-out;
+        animation: titlePop 0.6s ease-out, shine 6s linear infinite;
         margin-bottom: 0;
     }}
     @keyframes titlePop {{
         from {{ opacity: 0; transform: scale(0.94); }}
         to   {{ opacity: 1; transform: scale(1); }}
+    }}
+    @keyframes shine {{
+        to {{ background-position: 200% center; }}
     }}
     .hero-sub {{
         text-align: center;
@@ -120,8 +134,8 @@ st.markdown(
         animation: floatBot 3s ease-in-out infinite;
     }}
     @keyframes floatBot {{
-        0%, 100% {{ transform: translateY(0px); }}
-        50%      {{ transform: translateY(-8px); }}
+        0%, 100% {{ transform: translateY(0px) rotate(0deg); }}
+        50%      {{ transform: translateY(-8px) rotate(3deg); }}
     }}
 
     /* Chat bubbles */
@@ -186,6 +200,34 @@ st.markdown(
         margin-bottom: 6px;
     }}
 
+    /* Typing indicator */
+    .typing-row {{
+        display: flex;
+        margin-bottom: 0.9rem;
+        animation: msgIn 0.25s ease-out both;
+    }}
+    .typing-bubble {{
+        background: {bg_card};
+        border: 1px solid {border_col};
+        border-radius: 14px 14px 14px 2px;
+        padding: 0.8rem 1.1rem;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }}
+    .typing-dot {{
+        width: 7px; height: 7px;
+        border-radius: 50%;
+        background: #9b8bff;
+        animation: dotPulse 1.1s ease-in-out infinite;
+    }}
+    .typing-dot:nth-child(2) {{ animation-delay: 0.15s; }}
+    .typing-dot:nth-child(3) {{ animation-delay: 0.3s; }}
+    @keyframes dotPulse {{
+        0%, 60%, 100% {{ opacity: 0.3; transform: translateY(0); }}
+        30% {{ opacity: 1; transform: translateY(-4px); }}
+    }}
+
     /* Sidebar history cards */
     .hist-card {{
         background: {bg_card};
@@ -212,7 +254,9 @@ st.markdown(
         padding: 0.7rem 0.9rem;
         margin-bottom: 0.6rem;
         animation: itemIn 0.4s ease-out both;
+        transition: transform 0.15s ease, border-color 0.15s ease;
     }}
+    .stat-card:hover {{ transform: translateY(-2px); border-color: rgba(120,110,255,0.4); }}
     .stat-label {{ font-size: 0.75rem; color: {text_dim}; }}
     .stat-value {{ font-size: 1.4rem; font-weight: 700; color: {text_main}; }}
     .stat-delta {{ font-size: 0.72rem; color: #4fd18b; }}
@@ -231,6 +275,19 @@ st.markdown(
         box-shadow: 0 6px 16px rgba(80,110,255,0.25);
         border-color: rgba(120,110,255,0.55);
     }}
+    div.stFormSubmitButton > button {{
+        border-radius: 10px;
+        background: {accent_grad};
+        color: white;
+        font-weight: 700;
+        border: none;
+        transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    }}
+    div.stFormSubmitButton > button:hover {{
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(120,110,255,0.35);
+        filter: brightness(1.08);
+    }}
 
     /* Input bar */
     div[data-testid="stTextInput"] input {{
@@ -247,11 +304,18 @@ st.markdown(
         color: {text_dim};
         font-size: 0.78rem;
         margin-top: 0.8rem;
+        animation: itemIn 0.6s ease-out both;
     }}
     </style>
     """,
     unsafe_allow_html=True,
 )
+
+
+def file_signature(f):
+    """Stable identity for an uploaded file across reruns."""
+    return (f.name, f.size)
+
 
 # ------------------------------------------------------------------
 # SIDEBAR
@@ -266,15 +330,19 @@ with st.sidebar:
         label_visibility="collapsed", placeholder="Search history..."
     )
 
+    # BUG FIX: keep the ORIGINAL index from chat_log as the button key,
+    # not the position within the filtered/reversed list — otherwise keys
+    # collide or shift as the search text changes, causing stale reruns.
+    indexed_log = list(enumerate(st.session_state.chat_log))
     filtered = [
-        e for e in reversed(st.session_state.chat_log)
+        (i, e) for i, e in reversed(indexed_log)
         if st.session_state.history_search.lower() in e["question"].lower()
     ]
 
     if not filtered:
         st.caption("No matching history yet.")
     else:
-        for i, entry in enumerate(filtered):
+        for i, entry in filtered:
             short_q = entry["question"] if len(entry["question"]) <= 40 else entry["question"][:37] + "..."
             st.markdown(
                 f'<div class="hist-card">'
@@ -318,16 +386,36 @@ with st.sidebar:
 
     st.markdown("---")
     with st.expander("📎 Upload Document"):
-        uploaded_file = st.file_uploader("Upload a PDF or TXT file", type=["pdf", "txt"], label_visibility="collapsed")
+        uploaded_file = st.file_uploader(
+            "Upload a PDF or TXT file", type=["pdf", "txt"], label_visibility="collapsed"
+        )
         if uploaded_file:
-            files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
-            headers = {"X-Description": uploaded_file.name}
-            resp = requests.post(f"{BACKEND_URL}/rag/documents/upload", files=files, headers=headers)
-            if resp.status_code == 200:
+            sig = file_signature(uploaded_file)
+            # BUG FIX: st.file_uploader keeps returning the same file object
+            # on every rerun of the whole app (e.g. every time you send a
+            # chat message), which was silently re-uploading it and bumping
+            # "Documents Uploaded" each time. Only upload a signature we
+            # haven't already sent.
+            if sig in st.session_state.uploaded_files_seen:
                 st.success("Uploaded!")
-                st.session_state.doc_count += 1
             else:
-                st.error(resp.text)
+                with st.spinner("Uploading..."):
+                    files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
+                    headers = {"X-Description": uploaded_file.name}
+                    try:
+                        resp = requests.post(
+                            f"{BACKEND_URL}/rag/documents/upload",
+                            files=files, headers=headers, timeout=60,
+                        )
+                        if resp.status_code == 200:
+                            st.session_state.uploaded_files_seen.add(sig)
+                            st.session_state.doc_count += 1
+                            st.success("Uploaded!")
+                            st.toast(f"📄 {uploaded_file.name} added", icon="✅")
+                        else:
+                            st.error(resp.text)
+                    except Exception as e:
+                        st.error(f"Upload failed: {e}")
 
     st.markdown("---")
     dm_col1, dm_col2 = st.columns([3, 1])
@@ -372,9 +460,8 @@ for entry in st.session_state.chat_log:
     # Markdown treats 4+ leading spaces as an indented code block, so any
     # indentation here — combined with the AI answer's own line breaks —
     # can push the closing "</div></div>" past that 4-space threshold and
-    # cause it to render as literal text instead of closing the HTML tags
-    # (this was the bug you saw in the screenshot). Keeping it flush-left,
-    # in a single st.markdown call, avoids that entirely.
+    # cause it to render as literal text instead of closing the HTML tags.
+    # Keeping it flush-left, in a single st.markdown call, avoids that.
     bot_bubble_html = (
         f'<div class="msg-row msg-bot">'
         f'<div class="avatar avatar-bot">🤖</div>'
@@ -387,22 +474,46 @@ for entry in st.session_state.chat_log:
     )
     st.markdown(bot_bubble_html, unsafe_allow_html=True)
 
+# Animated typing indicator while a request is in flight
+thinking_placeholder = st.empty()
+if st.session_state.is_thinking:
+    thinking_placeholder.markdown(
+        '<div class="typing-row">'
+        '<div class="avatar avatar-bot">🤖</div>'
+        '<div class="typing-bubble">'
+        '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>'
+        '</div></div>',
+        unsafe_allow_html=True,
+    )
+
 st.write("")
 
 # ------------------------------------------------------------------
 # Input bar
+# BUG FIX: wrapped in st.form so pressing Enter submits the question,
+# not just clicking the Send button.
 # ------------------------------------------------------------------
-col_input, col_send = st.columns([6, 1])
-with col_input:
-    question = st.text_input(
-        "Ask anything...", key="question_input",
-        label_visibility="collapsed", placeholder="Ask anything..."
-    )
-with col_send:
-    send_clicked = st.button("➤ Send", use_container_width=True)
+with st.form(key="ask_form", clear_on_submit=False):
+    col_input, col_send = st.columns([6, 1])
+    with col_input:
+        question = st.text_input(
+            "Ask anything...", key="question_input",
+            label_visibility="collapsed", placeholder="Ask anything..."
+        )
+    with col_send:
+        send_clicked = st.form_submit_button("➤ Send", use_container_width=True)
 
 if send_clicked:
     if question.strip():
+        st.session_state.is_thinking = True
+        thinking_placeholder.markdown(
+            '<div class="typing-row">'
+            '<div class="avatar avatar-bot">🤖</div>'
+            '<div class="typing-bubble">'
+            '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>'
+            '</div></div>',
+            unsafe_allow_html=True,
+        )
         try:
             start = time.time()
             response = requests.post(
@@ -431,16 +542,22 @@ if send_clicked:
                 st.session_state.chat_log.append({
                     "question": question,
                     "answer": answer_text,
-                    "time": datetime.now().strftime("%H:%M %p"),
+                    # BUG FIX: "%H:%M %p" mixed 24-hour format with an AM/PM
+                    # marker, producing nonsense like "17:20 PM". %I gives a
+                    # proper 12-hour value that actually matches %p.
+                    "time": datetime.now().strftime("%I:%M %p"),
                     "sources": sources,
                     "elapsed": elapsed,
                 })
                 st.session_state.clear_input = True
+                st.session_state.is_thinking = False
                 st.rerun()
             else:
+                st.session_state.is_thinking = False
                 st.error(f"Error: {response.status_code}")
                 st.text(response.text)
         except Exception as e:
+            st.session_state.is_thinking = False
             st.error(f"Request failed: {e}")
     else:
         st.warning("Please enter a question.")
