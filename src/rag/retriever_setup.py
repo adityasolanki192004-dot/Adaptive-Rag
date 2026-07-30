@@ -16,8 +16,9 @@ embeddings = OpenAIEmbeddings()
 # This ensures get_retriever() can access documents stored by retriever_chain()
 
 
-def retriever_chain(chunks: list[Document]):
+def retriever_chain(chunks: list[Document]) -> bool:
     """
+    Store document chunks in the Qdrant vector store.
 
     Args:
         chunks: List of document chunks to store.
@@ -25,27 +26,17 @@ def retriever_chain(chunks: list[Document]):
     Returns:
         Boolean indicating success of the operation.
     """
-
-
     try:
-        # vectorstore = QdrantVectorStore.from_documents(
-        #     documents=chunks,
-        #     embedding=embeddings,
-        #     url=settings.QDRANT_URL,
-        #     api_key=settings.QDRANT_API_KEY,
-        #     collection_name=settings.CODE_COLLECTION,
-        # )
-        try:
-    QdrantVectorStore.from_documents(
-        documents=chunks,
-        embedding=embeddings,
-        url=settings.QDRANT_URL,
-        api_key=settings.QDRANT_API_KEY,
-        collection_name=settings.CODE_COLLECTION,
-    )
+        QdrantVectorStore.from_documents(
+            documents=chunks,
+            embedding=embeddings,
+            url=settings.QDRANT_URL,
+            api_key=settings.QDRANT_API_KEY,
+            collection_name=settings.CODE_COLLECTION,
+        )
 
-    print(f"Stored {len(chunks)} chunks in Qdrant")
-    return True
+        print(f"Stored {len(chunks)} chunks in Qdrant")
+        return True
     except Exception as e:
         print(f"Error storing documents in Qdrant: {e}")
         return False
@@ -53,7 +44,6 @@ def retriever_chain(chunks: list[Document]):
 
 def get_retriever():
     """
-
     Returns the retriever tool that can search documents stored by retriever_chain().
     If no documents have been uploaded yet, creates a retriever with a dummy document.
 
@@ -63,19 +53,27 @@ def get_retriever():
     Raises:
         Exception: If vector store initialization fails.
     """
-  
-
     try:
-        # Commenting out Qdrant code for temporary FAISS usage
-        # vectorstore = QdrantVectorStore.from_documents(
-        #     documents=[],
-        #     embedding=embeddings,
-        #     url=settings.QDRANT_URL,
-        #     api_key=settings.QDRANT_API_KEY,
-        #     collection_name=settings.CODE_COLLECTION,
-        # )
-        # retriever = vectorstore.as_retriever()
-    
+        try:
+            # Normal case: collection already exists because documents were uploaded.
+            vectorstore = QdrantVectorStore.from_existing_collection(
+                embedding=embeddings,
+                url=settings.QDRANT_URL,
+                api_key=settings.QDRANT_API_KEY,
+                collection_name=settings.CODE_COLLECTION,
+            )
+        except Exception:
+            # No documents uploaded yet - create the collection with a
+            # placeholder document so the graph can still run end to end.
+            vectorstore = QdrantVectorStore.from_documents(
+                documents=[Document(page_content="No documents uploaded yet.")],
+                embedding=embeddings,
+                url=settings.QDRANT_URL,
+                api_key=settings.QDRANT_API_KEY,
+                collection_name=settings.CODE_COLLECTION,
+            )
+
+        retriever = vectorstore.as_retriever()
 
         # Load document description
         if os.path.exists("description.txt"):
