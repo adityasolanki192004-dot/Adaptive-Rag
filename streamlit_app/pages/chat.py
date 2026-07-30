@@ -39,7 +39,7 @@ if st.session_state.show_logout_confirm:
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
             # Redirect to home page
-          st.switch_page("home.py")
+            st.switch_page("home.py")
     with col_cancel:
         if st.button("❌ Cancel"):
             st.session_state.show_logout_confirm = False
@@ -94,7 +94,7 @@ user_input = st.chat_input("Ask a question...")
 # Process user input and get response
 if user_input:
     st.session_state.chat_history.append(("user", user_input))
-    response = query_backend(user_input, st.session_state["jwt_token"])
+    response = query_backend(user_input, st.session_state["session_id"])
     st.session_state.chat_history.append(("assistant", response))
     st.rerun()  # Rerun script to display updated messages
 
