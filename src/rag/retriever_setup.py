@@ -13,9 +13,7 @@ from src.core.config import settings
 
 embeddings = OpenAIEmbeddings()
 
-# Global variable to store the FAISS vectorstore instance
 # This ensures get_retriever() can access documents stored by retriever_chain()
-_faiss_vectorstore = None
 
 
 def retriever_chain(chunks: list[Document]):
