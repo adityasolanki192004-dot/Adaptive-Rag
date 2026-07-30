@@ -13,30 +13,42 @@ from src.rag.retriever_setup import get_retriever
 
 config = Config()
 
-# Initialize tools
-tools = [get_retriever()]
-
-# Load document description if available
-if os.path.exists("description.txt"):
-    with open("description.txt", "r", encoding="utf-8") as f:
-        description = f.read()
-else:
-    description = None
-
-# Create ReAct agent prompt
+# Create ReAct agent prompt (doesn't need any live connections, safe at import time)
 prompt = ChatPromptTemplate.from_messages([
     ("system", config.prompt("system_prompt")),
     ("human", "{input}"),
     ("ai", "{agent_scratchpad}")
 ])
 
-# Initialize the ReAct agent and executor
-react_agent = create_react_agent(llm, tools, prompt)
-agent_executor = AgentExecutor(
-    agent=react_agent,
-    tools=tools,
-    handle_parsing_errors=True,
-    max_iterations=2,
-    verbose=True,
-    return_intermediate_steps=True
-)
+_agent_executor = None
+
+
+def get_agent_executor() -> AgentExecutor:
+    """
+    Lazily build the ReAct agent executor on first use.
+
+    This avoids connecting to the vector store (Qdrant) at module import
+    time, which would crash the whole app on startup if the vector store
+    isn't reachable yet. The connection is only attempted when a query
+    actually needs the retriever, and any failure only affects that
+    request instead of preventing the server from starting.
+
+    Returns:
+        A cached AgentExecutor instance.
+    """
+    global _agent_executor
+
+    if _agent_executor is None:
+        tools = [get_retriever()]
+
+        react_agent = create_react_agent(llm, tools, prompt)
+        _agent_executor = AgentExecutor(
+            agent=react_agent,
+            tools=tools,
+            handle_parsing_errors=True,
+            max_iterations=2,
+            verbose=True,
+            return_intermediate_steps=True
+        )
+
+    return _agent_executor
