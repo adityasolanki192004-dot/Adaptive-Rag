@@ -28,7 +28,7 @@ prompts:
     Priority:
     - Always choose "index" when relevant context exists, no matter what.
     - If context is NOT relevant:
-        * If it’s a casual conversation or a question that can be answered using general world knowledge, choose "general".
+        * If it's a casual conversation or a question that can be answered using general world knowledge, choose "general".
         * Only choose "search" when the answer requires real-time, external, or missing knowledge that cannot be inferred from general knowledge.
     
     ---
