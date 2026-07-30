@@ -64,6 +64,11 @@ def verify_answer(state: State) -> Literal["__end__", "generate"]:
         if len(messages) < 2:
             return "__end__"
 
+        # Avoid looping forever if the answer keeps failing verification
+        if state.get("generate_retry", 0) >= 2:
+            print("[verify] Max regenerate attempts reached. Ending.")
+            return "__end__"
+
         # Retrieved documents / context
         context = messages[-2].content
 
