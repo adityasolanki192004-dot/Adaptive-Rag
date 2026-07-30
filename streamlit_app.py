@@ -1,4 +1,5 @@
 import html
+import os
 import time
 from datetime import datetime
 
@@ -8,7 +9,10 @@ import streamlit as st
 # ------------------------------------------------------------------
 # Config
 # ------------------------------------------------------------------
-BACKEND_URL = "https://adaptive-rag-backend-fyyu.onrender.com"
+# Override with the BACKEND_URL env var to point this at a local
+# `uvicorn src.main:app` instance instead of the deployed one, e.g.:
+#   BACKEND_URL=http://127.0.0.1:8000 streamlit run streamlit_app.py
+BACKEND_URL = os.getenv("BACKEND_URL", "https://adaptive-rag-backend-fyyu.onrender.com")
 
 st.set_page_config(
     page_title="Adaptive RAG Chat",
