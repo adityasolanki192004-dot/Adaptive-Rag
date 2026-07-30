@@ -1,7 +1,9 @@
-import streamlit as st
-import requests
+import html
 import time
 from datetime import datetime
+
+import requests
+import streamlit as st
 
 # ------------------------------------------------------------------
 # Config
@@ -31,15 +33,18 @@ if "question_input" not in st.session_state:
 if "clear_input" not in st.session_state:
     st.session_state.clear_input = False
 if "uploaded_files_seen" not in st.session_state:
-    # BUG FIX: tracks (name, size) pairs already sent to the backend so the
-    # widget's persisted file doesn't get re-uploaded on every rerun
-    # (e.g. every time a chat message is sent). This was inflating the
-    # "Documents Uploaded" counter (18 for a single file in the screenshot).
+    # Tracks (name, size) pairs already sent to the backend so the widget's
+    # persisted file doesn't get re-uploaded on every rerun (e.g. every time
+    # a chat message is sent). Without this, "Documents Uploaded" inflates
+    # on every rerun even though nothing new was uploaded.
     st.session_state.uploaded_files_seen = set()
 if "is_thinking" not in st.session_state:
     st.session_state.is_thinking = False
-if "upload_toast" not in st.session_state:
-    st.session_state.upload_toast = None
+if "stream_next" not in st.session_state:
+    # When True, the most recent chat_log entry hasn't been "typed out" on
+    # screen yet — the render loop below will animate it once, then flip
+    # this back to False so it renders instantly on every later rerun.
+    st.session_state.stream_next = False
 
 # Clear the input BEFORE the widget is instantiated this run (safe to do here)
 if st.session_state.clear_input:
@@ -158,6 +163,8 @@ st.markdown(
         border-radius: 14px 14px 2px 14px;
         max-width: 70%;
         font-weight: 500;
+        white-space: pre-wrap;
+        word-wrap: break-word;
     }}
     .bubble-bot {{
         background: {bg_card};
@@ -166,6 +173,8 @@ st.markdown(
         padding: 0.9rem 1.1rem;
         border-radius: 14px 14px 14px 2px;
         max-width: 78%;
+        white-space: pre-wrap;
+        word-wrap: break-word;
     }}
     .bubble-time {{
         font-size: 0.72rem;
@@ -200,7 +209,7 @@ st.markdown(
         margin-bottom: 6px;
     }}
 
-    /* Typing indicator */
+    /* Typing indicator (waiting for the backend) */
     .typing-row {{
         display: flex;
         margin-bottom: 0.9rem;
@@ -226,6 +235,18 @@ st.markdown(
     @keyframes dotPulse {{
         0%, 60%, 100% {{ opacity: 0.3; transform: translateY(0); }}
         30% {{ opacity: 1; transform: translateY(-4px); }}
+    }}
+
+    /* Claude-style blinking text cursor while an answer is streaming in */
+    .type-cursor {{
+        display: inline-block;
+        width: 2px;
+        margin-left: 2px;
+        background: #9b8bff;
+        animation: cursorBlink 0.85s step-start infinite;
+    }}
+    @keyframes cursorBlink {{
+        50% {{ opacity: 0; }}
     }}
 
     /* Sidebar history cards */
@@ -317,6 +338,119 @@ def file_signature(f):
     return (f.name, f.size)
 
 
+def esc(text) -> str:
+    """
+    HTML-escape any user- or model-provided text before it goes into an
+    unsafe_allow_html block. Without this, a question or answer containing
+    '<', '>' or '&' can break the bubble markup or, worse, get executed as
+    HTML/JS in the page.
+    """
+    return html.escape(str(text))
+
+
+def format_answer_html(text: str) -> str:
+    """Escape the answer and turn newlines into <br> so multi-line answers
+    (lists, steps, etc.) still read correctly inside the bubble."""
+    return esc(text).replace("\n", "<br>")
+
+
+def build_sources_html(entry: dict) -> str:
+    """
+    Render source pills if the backend provided any, with a graceful
+    fallback: the current backend doesn't return document filenames, only
+    which tool the agent called. If that's all we have, show a small
+    "used document search" hint instead of silently showing nothing.
+    """
+    sources = entry.get("sources") or []
+    if sources:
+        pills = "".join(f'<span class="source-pill">📄 {esc(s)}</span>' for s in sources)
+        return (
+            '<div class="sources-row">'
+            '<div class="sources-label">Sources:</div>'
+            f'{pills}'
+            '</div>'
+        )
+
+    tool_calls = entry.get("tool_calls") or []
+    if tool_calls:
+        pills = "".join(
+            f'<span class="source-pill">🔎 searched: {esc(tc.get("input", ""))}</span>'
+            for tc in tool_calls if tc.get("input")
+        )
+        if pills:
+            return (
+                '<div class="sources-row">'
+                '<div class="sources-label">Document search used:</div>'
+                f'{pills}'
+                '</div>'
+            )
+    return ""
+
+
+def build_user_bubble_html(entry: dict) -> str:
+    return (
+        '<div class="msg-row msg-user">'
+        f'<div class="bubble-user">{esc(entry["question"])}</div>'
+        '<div class="avatar avatar-user">🧑</div>'
+        '</div>'
+    )
+
+
+def build_bot_bubble_html(entry: dict, answer_override: str = None, show_cursor: bool = False) -> str:
+    """
+    IMPORTANT: every line here is built with no leading indentation inside
+    the f-strings. Markdown treats 4+ leading spaces as a code block, so
+    stray indentation combined with the AI answer's own line breaks can
+    push the closing </div></div> past that threshold and make it render
+    as literal text instead of closing the HTML tags.
+    """
+    answer_source = entry["answer"] if answer_override is None else answer_override
+    answer_html = format_answer_html(answer_source)
+    cursor_html = '<span class="type-cursor">&nbsp;</span>' if show_cursor else ""
+    sources_html = "" if show_cursor else build_sources_html(entry)
+
+    return (
+        '<div class="msg-row msg-bot">'
+        '<div class="avatar avatar-bot">🤖</div>'
+        '<div class="bubble-bot">'
+        f'<div class="bubble-time">{esc(entry["time"])}</div>'
+        f'{answer_html}{cursor_html}'
+        f'{sources_html}'
+        '</div>'
+        '</div>'
+    )
+
+
+def stream_bot_bubble(entry: dict, placeholder) -> None:
+    """
+    Claude-style progressive reveal: types the answer into the placeholder
+    a few words at a time instead of dumping the whole thing in at once.
+    Speed scales with answer length so a long answer doesn't take forever.
+    """
+    words = entry["answer"].split(" ")
+    total = len(words)
+    if total == 0:
+        placeholder.markdown(build_bot_bubble_html(entry), unsafe_allow_html=True)
+        return
+
+    # Cap the number of visual "frames" so very long answers don't crawl.
+    step = max(1, total // 60)
+    delay = 0.02
+
+    shown_words = []
+    for i in range(0, total, step):
+        shown_words = words[: i + step]
+        partial = " ".join(shown_words)
+        placeholder.markdown(
+            build_bot_bubble_html(entry, answer_override=partial, show_cursor=True),
+            unsafe_allow_html=True,
+        )
+        time.sleep(delay)
+
+    # Final frame: full text, no cursor, sources visible.
+    placeholder.markdown(build_bot_bubble_html(entry), unsafe_allow_html=True)
+
+
 # ------------------------------------------------------------------
 # SIDEBAR
 # ------------------------------------------------------------------
@@ -330,9 +464,9 @@ with st.sidebar:
         label_visibility="collapsed", placeholder="Search history..."
     )
 
-    # BUG FIX: keep the ORIGINAL index from chat_log as the button key,
-    # not the position within the filtered/reversed list — otherwise keys
-    # collide or shift as the search text changes, causing stale reruns.
+    # Keep the ORIGINAL index from chat_log as the button key, not the
+    # position within the filtered/reversed list — otherwise keys collide
+    # or shift as the search text changes, causing stale reruns.
     indexed_log = list(enumerate(st.session_state.chat_log))
     filtered = [
         (i, e) for i, e in reversed(indexed_log)
@@ -346,8 +480,8 @@ with st.sidebar:
             short_q = entry["question"] if len(entry["question"]) <= 40 else entry["question"][:37] + "..."
             st.markdown(
                 f'<div class="hist-card">'
-                f'<div class="hist-q">💬 {short_q}</div>'
-                f'<div class="hist-t">{entry["time"]}</div>'
+                f'<div class="hist-q">💬 {esc(short_q)}</div>'
+                f'<div class="hist-t">{esc(entry["time"])}</div>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
@@ -357,6 +491,7 @@ with st.sidebar:
 
     if st.button("🗑️ Clear History", use_container_width=True):
         st.session_state.chat_log = []
+        st.session_state.stream_next = False
         st.rerun()
 
     st.markdown("---")
@@ -391,11 +526,11 @@ with st.sidebar:
         )
         if uploaded_file:
             sig = file_signature(uploaded_file)
-            # BUG FIX: st.file_uploader keeps returning the same file object
-            # on every rerun of the whole app (e.g. every time you send a
-            # chat message), which was silently re-uploading it and bumping
-            # "Documents Uploaded" each time. Only upload a signature we
-            # haven't already sent.
+            # st.file_uploader keeps returning the same file object on every
+            # rerun of the whole app (e.g. every time you send a chat
+            # message), which would otherwise silently re-upload it and
+            # bump "Documents Uploaded" each time. Only upload a signature
+            # we haven't already sent.
             if sig in st.session_state.uploaded_files_seen:
                 st.success("Uploaded!")
             else:
@@ -437,42 +572,18 @@ st.markdown('<div class="hero-sub">Ask anything from your documents</div>', unsa
 st.markdown('<div class="mascot-wrap"><div class="mascot">🤖</div></div>', unsafe_allow_html=True)
 
 # Render conversation
-for entry in st.session_state.chat_log:
-    st.markdown(
-        f'<div class="msg-row msg-user">'
-        f'<div class="bubble-user">{entry["question"]}</div>'
-        f'<div class="avatar avatar-user">🧑</div>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
+last_index = len(st.session_state.chat_log) - 1
+for idx, entry in enumerate(st.session_state.chat_log):
+    st.markdown(build_user_bubble_html(entry), unsafe_allow_html=True)
 
-    sources_html = ""
-    if entry.get("sources"):
-        pills = "".join(f'<span class="source-pill">📄 {s}</span>' for s in entry["sources"])
-        sources_html = (
-            f'<div class="sources-row">'
-            f'<div class="sources-label">Sources:</div>'
-            f'{pills}'
-            f'</div>'
-        )
-
-    # IMPORTANT: every line below is flush-left (no leading spaces).
-    # Markdown treats 4+ leading spaces as an indented code block, so any
-    # indentation here — combined with the AI answer's own line breaks —
-    # can push the closing "</div></div>" past that 4-space threshold and
-    # cause it to render as literal text instead of closing the HTML tags.
-    # Keeping it flush-left, in a single st.markdown call, avoids that.
-    bot_bubble_html = (
-        f'<div class="msg-row msg-bot">'
-        f'<div class="avatar avatar-bot">🤖</div>'
-        f'<div class="bubble-bot">'
-        f'<div class="bubble-time">{entry["time"]}</div>'
-        f'{entry["answer"]}'
-        f'{sources_html}'
-        f'</div>'
-        f'</div>'
-    )
-    st.markdown(bot_bubble_html, unsafe_allow_html=True)
+    if idx == last_index and st.session_state.stream_next:
+        # Newest answer: type it out once, Claude-style, then freeze it.
+        bot_placeholder = st.empty()
+        stream_bot_bubble(entry, bot_placeholder)
+        st.session_state.stream_next = False
+    else:
+        # Already-seen history: render instantly, no replaying the animation.
+        st.markdown(build_bot_bubble_html(entry), unsafe_allow_html=True)
 
 # Animated typing indicator while a request is in flight
 thinking_placeholder = st.empty()
@@ -490,8 +601,8 @@ st.write("")
 
 # ------------------------------------------------------------------
 # Input bar
-# BUG FIX: wrapped in st.form so pressing Enter submits the question,
-# not just clicking the Send button.
+# Wrapped in st.form so pressing Enter submits the question, not just
+# clicking the Send button.
 # ------------------------------------------------------------------
 with st.form(key="ask_form", clear_on_submit=False):
     col_input, col_send = st.columns([6, 1])
@@ -528,11 +639,13 @@ if send_clicked:
 
                 answer_text = "No answer found."
                 sources = []
+                tool_calls = []
                 if "result" in data:
                     result = data["result"]
                     if isinstance(result, dict):
                         answer_text = result.get("content", "No answer found.")
                         sources = result.get("sources", [])
+                        tool_calls = (result.get("additional_kwargs") or {}).get("tool_calls", [])
                     else:
                         answer_text = str(result)
                 elif "content" in data:
@@ -542,22 +655,26 @@ if send_clicked:
                 st.session_state.chat_log.append({
                     "question": question,
                     "answer": answer_text,
-                    # BUG FIX: "%H:%M %p" mixed 24-hour format with an AM/PM
-                    # marker, producing nonsense like "17:20 PM". %I gives a
-                    # proper 12-hour value that actually matches %p.
+                    # "%H:%M %p" mixes 24-hour format with an AM/PM marker,
+                    # producing nonsense like "17:20 PM". %I gives a proper
+                    # 12-hour value that actually matches %p.
                     "time": datetime.now().strftime("%I:%M %p"),
                     "sources": sources,
+                    "tool_calls": tool_calls,
                     "elapsed": elapsed,
                 })
                 st.session_state.clear_input = True
                 st.session_state.is_thinking = False
+                st.session_state.stream_next = True
                 st.rerun()
             else:
                 st.session_state.is_thinking = False
+                thinking_placeholder.empty()  # don't leave the dots stuck on screen
                 st.error(f"Error: {response.status_code}")
                 st.text(response.text)
         except Exception as e:
             st.session_state.is_thinking = False
+            thinking_placeholder.empty()  # don't leave the dots stuck on screen
             st.error(f"Request failed: {e}")
     else:
         st.warning("Please enter a question.")
