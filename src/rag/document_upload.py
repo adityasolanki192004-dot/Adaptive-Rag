@@ -10,6 +10,7 @@ from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from src.rag.retriever_setup import retriever_chain
+from src.rag.reAct_agent import reset_agent_executor
 from src.tools.common_tools import enhance_description_with_llm
 
 
@@ -32,6 +33,9 @@ def documents(description: str, file: UploadFile = File(...)):
     """
     filename = file.filename
     print(filename)
+
+    if not description or not description.strip():
+        description = f"the uploaded document '{filename}'"
     if not filename.endswith(".pdf") and not filename.endswith(".txt"):
         from fastapi import HTTPException
         raise HTTPException(
@@ -82,7 +86,13 @@ def documents(description: str, file: UploadFile = File(...)):
     )
     chunks = splitter.split_documents(docs)
 
-    return retriever_chain(chunks)
+    success = retriever_chain(chunks)
+
+    # Make sure the next query rebuilds the agent with the fresh retriever
+    # tool/description instead of reusing a stale cached one.
+    reset_agent_executor()
+
+    return success
 
 
 
