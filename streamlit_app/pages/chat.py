@@ -4,7 +4,7 @@ Chat page for the Streamlit application.
 
 import streamlit as st
 
-from streamlit_app.utils.api_client import query_backend, document_upload_rag
+from utils.api_client import query_backend, document_upload_rag
 
 # Configure page settings
 st.set_page_config(
