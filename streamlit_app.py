@@ -11,7 +11,6 @@ uploaded_file = st.file_uploader(
     "Upload Document",
     type=["pdf", "txt"]
 )
-)
 
 # User Input
 question = st.text_input("Ask a question")
