@@ -277,10 +277,10 @@ with st.sidebar:
         for i, entry in enumerate(filtered):
             short_q = entry["question"] if len(entry["question"]) <= 40 else entry["question"][:37] + "..."
             st.markdown(
-                f"""<div class="hist-card">
-                        <div class="hist-q">💬 {short_q}</div>
-                        <div class="hist-t">{entry['time']}</div>
-                    </div>""",
+                f'<div class="hist-card">'
+                f'<div class="hist-q">💬 {short_q}</div>'
+                f'<div class="hist-t">{entry["time"]}</div>'
+                f'</div>',
                 unsafe_allow_html=True,
             )
             if st.button("Ask again", key=f"reuse_{i}", use_container_width=True):
@@ -301,18 +301,18 @@ with st.sidebar:
     )
 
     st.markdown(
-        f"""<div class="stat-card">
-                <div class="stat-label">Total Questions</div>
-                <div class="stat-value">{total_q}</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Documents Uploaded</div>
-                <div class="stat-value">{st.session_state.doc_count}</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Avg Response Time</div>
-                <div class="stat-value">{avg_time:.2f}s</div>
-            </div>""",
+        f'<div class="stat-card">'
+        f'<div class="stat-label">Total Questions</div>'
+        f'<div class="stat-value">{total_q}</div>'
+        f'</div>'
+        f'<div class="stat-card">'
+        f'<div class="stat-label">Documents Uploaded</div>'
+        f'<div class="stat-value">{st.session_state.doc_count}</div>'
+        f'</div>'
+        f'<div class="stat-card">'
+        f'<div class="stat-label">Avg Response Time</div>'
+        f'<div class="stat-value">{avg_time:.2f}s</div>'
+        f'</div>',
         unsafe_allow_html=True,
     )
 
@@ -351,32 +351,41 @@ st.markdown('<div class="mascot-wrap"><div class="mascot">🤖</div></div>', uns
 # Render conversation
 for entry in st.session_state.chat_log:
     st.markdown(
-        f"""<div class="msg-row msg-user">
-                <div class="bubble-user">{entry['question']}</div>
-                <div class="avatar avatar-user">🧑</div>
-            </div>""",
+        f'<div class="msg-row msg-user">'
+        f'<div class="bubble-user">{entry["question"]}</div>'
+        f'<div class="avatar avatar-user">🧑</div>'
+        f'</div>',
         unsafe_allow_html=True,
     )
 
     sources_html = ""
     if entry.get("sources"):
         pills = "".join(f'<span class="source-pill">📄 {s}</span>' for s in entry["sources"])
-        sources_html = f"""<div class="sources-row">
-                                <div class="sources-label">Sources:</div>
-                                {pills}
-                            </div>"""
+        sources_html = (
+            f'<div class="sources-row">'
+            f'<div class="sources-label">Sources:</div>'
+            f'{pills}'
+            f'</div>'
+        )
 
-    st.markdown(
-        f"""<div class="msg-row msg-bot">
-                <div class="avatar avatar-bot">🤖</div>
-                <div class="bubble-bot">
-                    <div class="bubble-time">{entry['time']}</div>
-                    {entry['answer']}
-                    {sources_html}
-                </div>
-            </div>""",
-        unsafe_allow_html=True,
+    # IMPORTANT: every line below is flush-left (no leading spaces).
+    # Markdown treats 4+ leading spaces as an indented code block, so any
+    # indentation here — combined with the AI answer's own line breaks —
+    # can push the closing "</div></div>" past that 4-space threshold and
+    # cause it to render as literal text instead of closing the HTML tags
+    # (this was the bug you saw in the screenshot). Keeping it flush-left,
+    # in a single st.markdown call, avoids that entirely.
+    bot_bubble_html = (
+        f'<div class="msg-row msg-bot">'
+        f'<div class="avatar avatar-bot">🤖</div>'
+        f'<div class="bubble-bot">'
+        f'<div class="bubble-time">{entry["time"]}</div>'
+        f'{entry["answer"]}'
+        f'{sources_html}'
+        f'</div>'
+        f'</div>'
     )
+    st.markdown(bot_bubble_html, unsafe_allow_html=True)
 
 st.write("")
 
