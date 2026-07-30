@@ -9,7 +9,8 @@ st.title("Adaptive RAG Chat")
 
 uploaded_file = st.file_uploader(
     "Upload Document",
-    type=["pdf", "docx", "txt"]
+    type=["pdf", "txt"]
+)
 )
 
 # User Input
