@@ -37,17 +37,17 @@ def retriever_chain(chunks: list[Document]):
         #     api_key=settings.QDRANT_API_KEY,
         #     collection_name=settings.CODE_COLLECTION,
         # )
-        vectorstore = FAISS.from_documents(
-            documents=chunks,
-            embedding=embeddings
-        )
+        QdrantVectorStore.from_documents(
+    documents=chunks,
+    embedding=embeddings,
+    url=settings.QDRANT_URL,
+    api_key=settings.QDRANT_API_KEY,
+    collection_name=settings.CODE_COLLECTION,
+)
 
-        # Store the vectorstore globally so get_retriever() can access it
-        _faiss_vectorstore = vectorstore
+print(f"Stored {len(chunks)} chunks in Qdrant")
 
-        print("FAISS vector store initialized with documents")
-        print(f"Vectorstore contains {len(chunks)} document chunks")
-        return True
+return True
     except Exception as e:
         print(f"Error storing documents in FAISS: {e}")
         return False
