@@ -81,7 +81,7 @@ def retriever_node(state: State):
         dict: Updated messages with tool calls.
     """
     messages = state["latest_query"]
-   result = get_agent_executor().invoke({"input": messages})
+    result = get_agent_executor().invoke({"input": messages})
 
     # Extract tool calls
     intermediate_steps = result.get("intermediate_steps", [])
@@ -92,6 +92,15 @@ def retriever_node(state: State):
                 "tool": action.tool,
                 "input": action.tool_input,
             })
+
+    new_message = AIMessage(
+        content=result["output"],
+        additional_kwargs={"tool_calls": tool_calls},
+    )
+
+    return {
+        "messages": [new_message]
+    }
 
     new_message = AIMessage(
         content=result["output"],
