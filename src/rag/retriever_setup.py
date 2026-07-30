@@ -28,7 +28,6 @@ def retriever_chain(chunks: list[Document]):
 
 
     try:
-        # Commenting out Qdrant code for temporary FAISS usage
         # vectorstore = QdrantVectorStore.from_documents(
         #     documents=chunks,
         #     embedding=embeddings,
@@ -54,7 +53,6 @@ return True
 
 def get_retriever():
     """
-    Get a retriever tool connected to the FAISS vector store.
 
     Returns the retriever tool that can search documents stored by retriever_chain().
     If no documents have been uploaded yet, creates a retriever with a dummy document.
@@ -85,7 +83,6 @@ def get_retriever():
             # No documents uploaded yet, create dummy for initialization
             print("No documents uploaded yet, creating dummy vectorstore")
             
-            retriever = _faiss_vectorstore.as_retriever()
 
         # Load document description
         if os.path.exists("description.txt"):
