@@ -15,7 +15,11 @@ from src.llms.openai import llm
 from src.models.grade import Grade
 from src.models.route_identifier import RouteIdentifier
 from src.models.state import State
-from src.tools.graph_tools import routing_tool, doc_tool
+from src.tools.graph_tools import (
+    routing_tool,
+    doc_tool,
+    verify_answer,
+)
 
 config = Config()
 
@@ -127,29 +131,27 @@ def grade(state: State):
 
 def rewrite_query(state: State):
     """
-    Rewrite the query to get better retrieval results.
-
-    Args:
-        state (State): State of the question.
-
-    Returns:
-        dict: Updated latest_query.
+    Rewrite the query to improve retrieval.
     """
+
     query = state["latest_query"]
+
     rewrite_prompt = PromptTemplate(
         template=config.prompt("rewrite_prompt"),
         input_variables=["query"]
     )
+
     chain = rewrite_prompt | llm
     result = chain.invoke({"query": query})
+
     print(result)
 
     retry = state.get("retry_count", 0) + 1
 
-return {
-    "latest_query": result.content,
-    "retry_count": retry
-}
+    return {
+        "latest_query": result.content,
+        "retry_count": retry
+    }
 
 
 def generate(state: State):
@@ -172,7 +174,11 @@ def generate(state: State):
     generate_chain = generate_prompt | llm
     result = generate_chain.invoke({"context": context})
 
-    return {"messages": [{"role": "assistant", "content": result.content}]}
+ return {
+    "messages": [
+        AIMessage(content=result.content)
+    ]
+}
 
 
 def web_search(state: State):
@@ -220,4 +226,3 @@ graph.add_conditional_edges("generate", verify_answer)
 graph.add_edge("general_llm", END)
 
 builder = graph.compile()
-
