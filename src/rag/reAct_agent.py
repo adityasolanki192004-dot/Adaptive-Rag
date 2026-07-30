@@ -23,6 +23,18 @@ prompt = ChatPromptTemplate.from_messages([
 _agent_executor = None
 
 
+def reset_agent_executor() -> None:
+    """
+    Clear the cached agent executor.
+
+    Call this after a new document is uploaded so the next query rebuilds
+    the retriever tool (and its description) instead of reusing a stale
+    one from an earlier upload.
+    """
+    global _agent_executor
+    _agent_executor = None
+
+
 def get_agent_executor() -> AgentExecutor:
     """
     Lazily build the ReAct agent executor on first use.
