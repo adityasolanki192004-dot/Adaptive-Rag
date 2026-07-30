@@ -36,10 +36,18 @@ def query_classifier(state: State):
         dict: Updated state with route and latest_query.
     """
     question = state["messages"][-1].content
-    retriever = get_retriever()
-    context = retriever.invoke(question)
-    print("docs received from Qdrant")
-    print(context)
+
+    try:
+        retriever = get_retriever()
+        context = retriever.invoke(question)
+        print("docs received from Qdrant")
+        print(context)
+    except Exception as e:
+        # If the vector store / embeddings call fails, don't crash the
+        # whole request — fall back to no context so the classifier can
+        # still route the query to "general" or "search".
+        print(f"[query_classifier] retriever unavailable: {e}")
+        context = []
 
     llm_with_structured_output = llm.with_structured_output(RouteIdentifier)
     classify_prompt = PromptTemplate(
@@ -102,15 +110,6 @@ def retriever_node(state: State):
         "messages": [new_message]
     }
 
-    new_message = AIMessage(
-        content=result["output"],
-        additional_kwargs={"tool_calls": tool_calls},
-    )
-
-    return {
-        "messages": [new_message]
-    }
-
 
 def grade(state: State):
     """
@@ -163,6 +162,9 @@ def rewrite_query(state: State):
     }
 
 def generate(state: State):
+    """
+    Generate the final answer for the user.
+    """
     context = state["messages"][-1].content
     question = state.get("latest_query", "")
 
