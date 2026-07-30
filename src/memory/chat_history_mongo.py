@@ -40,17 +40,29 @@ class MongoDBChatMessageHistory(BaseChatMessageHistory):
             "timestamp": datetime.utcnow(),
         })
 
-    async def get_messages(self) -> List[BaseMessage]:
+    async def get_messages(self, limit: int = 20) -> List[BaseMessage]:
         """
-        Load all messages for a session from MongoDB.
+        Load the most recent messages for a session from MongoDB.
+
+        Args:
+            limit: Max number of messages to load (most recent). Keeping
+                this bounded matters because the whole list gets resent to
+                the LLM on every turn - without a cap, a long-running
+                conversation eventually pushes a single request over the
+                account's tokens-per-minute limit.
 
         Returns:
             List of messages in chronological order.
         """
         from langchain_core.messages import messages_from_dict
 
-        cursor = collection.find({"session_id": self.session_id}).sort("timestamp", 1)
-        docs = await cursor.to_list(length=1000)
+        cursor = (
+            collection.find({"session_id": self.session_id})
+            .sort("timestamp", -1)
+            .limit(limit)
+        )
+        docs = await cursor.to_list(length=limit)
+        docs.reverse()  # back to chronological order
 
         # Convert to BaseMessage objects
         return messages_from_dict([
