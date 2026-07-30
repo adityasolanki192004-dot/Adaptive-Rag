@@ -66,7 +66,7 @@ if submit:
             if response and response.get("jwt"):
                 st.session_state["jwt_token"] = response["jwt"]
                 st.session_state["username"] = username
-                st.switch_page("pages/Chat.py")
+                st.switch_page("pages/chat.py")
             else:
                 st.error("Login failed. Downstream API error: Received empty JWT token.")
 
