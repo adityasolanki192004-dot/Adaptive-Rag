@@ -167,10 +167,13 @@ def generate(state: State):
     generate_chain = generate_prompt | llm
     result = generate_chain.invoke({"context": context})
 
+    retry = state.get("generate_retry", 0) + 1
+
     return {
         "messages": [
             AIMessage(content=result.content)
-        ]
+        ],
+        "generate_retry": retry
     }
 
 def web_search(state: State):
