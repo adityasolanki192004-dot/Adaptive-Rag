@@ -59,17 +59,12 @@ if st.session_state.clear_input:
 # Theme colors
 # ------------------------------------------------------------------
 if st.session_state.dark_mode:
-    bg_main = (
-        "radial-gradient(circle at 15% 15%, rgba(59,130,246,0.16), transparent 42%),"
-        "radial-gradient(circle at 85% 25%, rgba(139,92,246,0.14), transparent 45%),"
-        "radial-gradient(circle at 50% 100%, rgba(34,211,238,0.10), transparent 55%),"
-        "#050914"
-    )
-    bg_card = "rgba(20,26,48,0.72)"
-    bg_sidebar = "#0a0e22"
+    bg_main = "#0b0c10"
+    bg_card = "#14151c"
+    bg_sidebar = "#0e0f15"
     text_main = "#f2f2f5"
     text_dim = "#9a9daa"
-    border_col = "rgba(120,160,255,0.18)"
+    border_col = "rgba(255,255,255,0.08)"
 else:
     bg_main = "#f5f6fa"
     bg_card = "#ffffff"
@@ -79,9 +74,6 @@ else:
     border_col = "rgba(0,0,0,0.08)"
 
 accent_grad = "linear-gradient(90deg, #4f7cff, #9b5cff)"
-# Cyan -> blue -> violet gradient used for the "RAG Chat" hero wordmark and
-# the neon glow accents, matching the reference banner's color scheme.
-hero_grad = "linear-gradient(90deg, #22d3ee, #3b82f6, #8b5cf6)"
 
 # ------------------------------------------------------------------
 # CSS
@@ -90,38 +82,13 @@ st.markdown(
     f"""
     <style>
     .stApp {{
-        background: {bg_main};
-        background-attachment: fixed;
+        background-color: {bg_main};
         color: {text_main};
         animation: pageFadeIn 0.5s ease-out;
-        position: relative;
     }}
     @keyframes pageFadeIn {{
         from {{ opacity: 0; transform: translateY(10px); }}
         to   {{ opacity: 1; transform: translateY(0); }}
-    }}
-
-    /* Slow-drifting glow blobs behind everything, echoing the neon-network
-       banner art. Painted first so real content always sits on top. */
-    .stApp::before {{
-        content: "";
-        position: fixed;
-        inset: 0;
-        z-index: 0;
-        pointer-events: none;
-        background:
-            radial-gradient(circle at 18% 25%, rgba(59,130,246,0.20), transparent 40%),
-            radial-gradient(circle at 82% 20%, rgba(139,92,246,0.16), transparent 42%),
-            radial-gradient(circle at 50% 105%, rgba(34,211,238,0.14), transparent 50%);
-        animation: glowDrift 14s ease-in-out infinite alternate;
-    }}
-    @keyframes glowDrift {{
-        from {{ transform: translate(0px, 0px) scale(1); }}
-        to   {{ transform: translate(18px, -14px) scale(1.06); }}
-    }}
-    section[data-testid="stAppViewContainer"], section[data-testid="stSidebar"] {{
-        position: relative;
-        z-index: 1;
     }}
 
     section[data-testid="stSidebar"] {{
@@ -129,30 +96,18 @@ st.markdown(
         border-right: 1px solid {border_col};
     }}
 
-    /* Two-line hero wordmark: plain "Adaptive" + cyan-blue-violet "RAG Chat" */
-    .hero-title-wrap {{
-        text-align: center;
-        position: relative;
-        z-index: 1;
-        margin-bottom: 0;
-    }}
-    .hero-title-line1 {{
-        font-size: 1.9rem;
+    /* Gradient hero title */
+    .hero-title {{
+        font-size: 2.6rem;
         font-weight: 800;
-        color: {text_main};
-        letter-spacing: 0.5px;
-        animation: titlePop 0.5s ease-out;
-    }}
-    .hero-title-line2 {{
-        font-size: 3.1rem;
-        font-weight: 900;
-        line-height: 1.1;
-        background: {hero_grad};
+        text-align: center;
+        background: {accent_grad};
         background-size: 200% auto;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
         animation: titlePop 0.6s ease-out, shine 6s linear infinite;
+        margin-bottom: 0;
     }}
     @keyframes titlePop {{
         from {{ opacity: 0; transform: scale(0.94); }}
@@ -164,129 +119,32 @@ st.markdown(
     .hero-sub {{
         text-align: center;
         color: {text_dim};
-        margin-top: 0.3rem;
-        margin-bottom: 1.4rem;
+        margin-top: 0.2rem;
+        margin-bottom: 1.2rem;
         animation: titlePop 0.7s ease-out;
-        position: relative;
-        z-index: 1;
-    }}
-    .hero-sub b {{
-        background: {hero_grad};
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
     }}
 
-    /* Documents -> AI engine -> Vector store flow diagram (banner-style) */
-    .brand-flow {{
+    /* Animated bot avatar (stand-in for mascot illustration) */
+    .mascot-wrap {{
         display: flex;
-        align-items: center;
         justify-content: center;
-        margin: 0.2rem 0 1.8rem 0;
-        position: relative;
-        z-index: 1;
+        margin-bottom: 1.5rem;
     }}
-    .flow-node {{
-        width: 62px;
-        height: 62px;
+    .mascot {{
+        width: 90px;
+        height: 90px;
         border-radius: 50%;
+        background: {accent_grad};
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.7rem;
-        background: {bg_card};
-        border: 1px solid {border_col};
-        box-shadow: 0 0 22px rgba(80,150,255,0.28);
-        animation: floatBot 4s ease-in-out infinite;
-    }}
-    .flow-brain {{
-        width: 92px;
-        height: 92px;
-        font-size: 2.5rem;
-        background: {hero_grad};
-        border: none;
-        animation: floatBot 3.2s ease-in-out infinite, pulseGlow 2.4s ease-in-out infinite;
+        font-size: 2.6rem;
+        box-shadow: 0 0 40px rgba(120,110,255,0.45);
+        animation: floatBot 3s ease-in-out infinite;
     }}
     @keyframes floatBot {{
-        0%, 100% {{ transform: translateY(0px); }}
-        50%      {{ transform: translateY(-8px); }}
-    }}
-    @keyframes pulseGlow {{
-        0%, 100% {{ box-shadow: 0 0 28px rgba(80,150,255,0.4); }}
-        50%      {{ box-shadow: 0 0 55px rgba(139,92,246,0.75); }}
-    }}
-    .flow-line {{
-        width: 64px;
-        height: 2px;
-        margin: 0 6px;
-        background-image: repeating-linear-gradient(90deg, #67a9ff 0 6px, transparent 6px 13px);
-        animation: flowMove 0.9s linear infinite;
-    }}
-    @keyframes flowMove {{
-        to {{ background-position: -19px 0; }}
-    }}
-
-    /* Feature badge row (Adaptive Retrieval / Semantic Search / ...) */
-    .feature-row {{
-        display: flex;
-        justify-content: center;
-        gap: 2.4rem;
-        flex-wrap: wrap;
-        margin-bottom: 1.6rem;
-        position: relative;
-        z-index: 1;
-    }}
-    .feature-item {{
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        width: 96px;
-        animation: itemIn 0.5s ease-out both;
-        transition: transform 0.2s ease;
-    }}
-    .feature-item:nth-child(2) {{ animation-delay: 0.08s; }}
-    .feature-item:nth-child(3) {{ animation-delay: 0.16s; }}
-    .feature-item:nth-child(4) {{ animation-delay: 0.24s; }}
-    .feature-item:hover {{ transform: translateY(-4px); }}
-    .feature-icon {{
-        width: 50px;
-        height: 50px;
-        border-radius: 50%;
-        border: 1.5px solid rgba(120,160,255,0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.3rem;
-        margin-bottom: 6px;
-        background: rgba(120,160,255,0.08);
-        box-shadow: 0 0 16px rgba(80,150,255,0.25);
-    }}
-    .feature-label {{
-        font-size: 0.72rem;
-        color: {text_dim};
-        font-weight: 600;
-        line-height: 1.25;
-    }}
-
-    /* Tech stack strip at the bottom of the page */
-    .tech-stack-row {{
-        display: flex;
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        margin-top: 1rem;
-        position: relative;
-        z-index: 1;
-    }}
-    .tech-pill {{
-        background: {bg_card};
-        border: 1px solid {border_col};
-        border-radius: 20px;
-        padding: 4px 12px;
-        font-size: 0.75rem;
-        color: {text_dim};
-        font-weight: 600;
+        0%, 100% {{ transform: translateY(0px) rotate(0deg); }}
+        50%      {{ transform: translateY(-8px) rotate(3deg); }}
     }}
 
     /* Chat bubbles */
@@ -713,40 +571,9 @@ with st.sidebar:
 # ------------------------------------------------------------------
 # MAIN AREA
 # ------------------------------------------------------------------
-st.markdown(
-    '<div class="hero-title-wrap">'
-    '<div class="hero-title-line1">Adaptive</div>'
-    '<div class="hero-title-line2">RAG Chat ✨</div>'
-    '</div>',
-    unsafe_allow_html=True,
-)
-st.markdown(
-    '<div class="hero-sub">AI-Powered <b>Retrieval-Augmented Generation</b> System</div>',
-    unsafe_allow_html=True,
-)
-st.markdown(
-    '<div class="brand-flow">'
-    '<div class="flow-node" title="Your documents">📄</div>'
-    '<div class="flow-line"></div>'
-    '<div class="flow-node flow-brain" title="AI engine">🧠</div>'
-    '<div class="flow-line"></div>'
-    '<div class="flow-node" title="Vector store">🗄️</div>'
-    '</div>',
-    unsafe_allow_html=True,
-)
-st.markdown(
-    '<div class="feature-row">'
-    '<div class="feature-item"><div class="feature-icon">🔍</div>'
-    '<div class="feature-label">Adaptive<br>Retrieval</div></div>'
-    '<div class="feature-item"><div class="feature-icon">🗂️</div>'
-    '<div class="feature-label">Semantic<br>Search</div></div>'
-    '<div class="feature-item"><div class="feature-icon">💬</div>'
-    '<div class="feature-label">Context-Aware<br>Responses</div></div>'
-    '<div class="feature-item"><div class="feature-icon">🧠</div>'
-    '<div class="feature-label">AI-Powered<br>Generation</div></div>'
-    '</div>',
-    unsafe_allow_html=True,
-)
+st.markdown('<div class="hero-title">Adaptive RAG Chat ✨</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-sub">Ask anything from your documents</div>', unsafe_allow_html=True)
+st.markdown('<div class="mascot-wrap"><div class="mascot">🤖</div></div>', unsafe_allow_html=True)
 
 # Render conversation
 last_index = len(st.session_state.chat_log) - 1
@@ -858,16 +685,5 @@ if send_clicked:
 
 st.markdown(
     '<div class="footnote">🔒 Your data is safe and secure. No data is stored without your permission.</div>',
-    unsafe_allow_html=True,
-)
-st.markdown(
-    '<div class="tech-stack-row">'
-    '<span class="tech-pill">🐍 Python</span>'
-    '<span class="tech-pill">⚡ FastAPI</span>'
-    '<span class="tech-pill">🎈 Streamlit</span>'
-    '<span class="tech-pill">🔗 LangChain</span>'
-    '<span class="tech-pill">📊 FAISS</span>'
-    '<span class="tech-pill">🧠 LLM</span>'
-    '</div>',
     unsafe_allow_html=True,
 )
